@@ -134,10 +134,7 @@ Your executable includes:
 - **FFmpeg**: Downloaded automatically via `download_ffmpeg.bat`
 
 ## 📸 Screenshots!
-![WhatsApp Image 2025-08-17 at 17 45 01_2d710589](https://github.com/user-attachments/assets/79e98cdb-df21-4288-928b-7b1eefaa1875)
-
-
-> Add screenshots of your application here to show users what to expect!
+<img src="https://github.com/user-attachments/assets/79e98cdb-df21-4288-928b-7b1eefaa1875" alt="App Screenshot" width="600">
 
 ## 🤝 Contributing
 
