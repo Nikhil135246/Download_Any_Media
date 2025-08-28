@@ -68,11 +68,29 @@ Access settings via File → Settings to configure:
 
 ## Building Standalone Executable
 
-To create a standalone executable:
+To create a standalone executable with custom icon:
+
+### Prerequisites
 ```bash
 uv add --dev pyinstaller
-uv run pyinstaller --onefile --windowed main.py
 ```
+
+### Build Process
+1. Build the executable:
+   ```bash
+   uv run pyinstaller YouTube-Downloader.spec
+   ```
+
+2. The executable will be created in the `dist/` folder as `YouTube-Downloader.exe`
+
+### Custom Icon
+The application includes a custom download icon that will appear in:
+- Windows Explorer
+- Taskbar when running
+- Desktop shortcuts
+- Start menu (if pinned)
+
+**Note**: If you see cached old icons after building, restart your computer or clear Windows icon cache to see the updated icon.
 
 ## License
 
