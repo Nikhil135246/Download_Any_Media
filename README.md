@@ -1,4 +1,4 @@
-![WhatsApp Image 2025-08-17 at 17 45 01_2d710589](https://github.com/user-attachments/assets/79e98cdb-df21-4288-928b-7b1eefaa1875)# YouTube Downloader GUI
+# YouTube Downloader GUI
 
 A standalone desktop application for downloading YouTube videos and audio with a clean, user-friendly interface. **No installation required** - just download and run!
 
@@ -134,7 +134,7 @@ Your executable includes:
 - **FFmpeg**: Downloaded automatically via `download_ffmpeg.bat`
 
 ## 📸 Screenshots!
-[Uploading WhatsApp Image 2025-08-17 at 17.45.01_2d710589.jpg…]()
+![WhatsApp Image 2025-08-17 at 17 45 01_2d710589](https://github.com/user-attachments/assets/79e98cdb-df21-4288-928b-7b1eefaa1875)
 
 
 > Add screenshots of your application here to show users what to expect!
