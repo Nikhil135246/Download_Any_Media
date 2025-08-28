@@ -9,6 +9,7 @@ import os
 import subprocess
 import threading
 import json
+import shutil
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -19,6 +20,85 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QThread, Signal, QSettings, Qt
 from PySide6.QtGui import QFont, QIcon, QAction
 import yt_dlp
+
+
+def setup_ffmpeg():
+    """Setup FFmpeg path for bundled executable"""
+    if getattr(sys, 'frozen', False):
+        # Running as bundled executable
+        bundle_dir = sys._MEIPASS
+        ffmpeg_path = os.path.join(bundle_dir, 'ffmpeg', 'ffmpeg.exe')
+        ffprobe_path = os.path.join(bundle_dir, 'ffmpeg', 'ffprobe.exe')
+        
+        if os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path):
+            # Add FFmpeg to PATH
+            ffmpeg_dir = os.path.dirname(ffmpeg_path)
+            current_path = os.environ.get('PATH', '')
+            if ffmpeg_dir not in current_path:
+                os.environ['PATH'] = ffmpeg_dir + os.pathsep + current_path
+            return True
+    else:
+        # Running in development - check if FFmpeg is in our ffmpeg folder
+        ffmpeg_path = os.path.join(os.getcwd(), 'ffmpeg', 'bin', 'ffmpeg.exe')
+        ffprobe_path = os.path.join(os.getcwd(), 'ffmpeg', 'bin', 'ffprobe.exe')
+        
+        if os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path):
+            # Add to PATH
+            ffmpeg_dir = os.path.dirname(ffmpeg_path)
+            current_path = os.environ.get('PATH', '')
+            if ffmpeg_dir not in current_path:
+                os.environ['PATH'] = ffmpeg_dir + os.pathsep + current_path
+            return True
+    
+    # Check if FFmpeg is already in system PATH
+    return shutil.which('ffmpeg') is not None
+
+
+def get_safe_ydl_opts(output_path, is_audio=False, is_playlist=False):
+    """Get yt-dlp options that work with or without FFmpeg"""
+    
+    ffmpeg_available = setup_ffmpeg()
+    
+    base_opts = {
+        'outtmpl': output_path,
+        'ignoreerrors': True,
+        'no_warnings': False,
+        'extractflat': False,
+    }
+    
+    if is_playlist:
+        base_opts['noplaylist'] = False
+    else:
+        base_opts['noplaylist'] = True
+    
+    if is_audio:
+        if ffmpeg_available:
+            base_opts.update({
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+            })
+        else:
+            # Fallback: download best audio format available
+            base_opts.update({
+                'format': 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best',
+            })
+    else:
+        # Video download
+        if ffmpeg_available:
+            base_opts.update({
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best',
+            })
+        else:
+            # Fallback: download pre-merged formats only
+            base_opts.update({
+                'format': 'best[ext=mp4][height<=1080]/best[ext=mp4]/best[height<=720]/best',
+            })
+    
+    return base_opts
 
 
 class DownloadWorker(QThread):
@@ -36,48 +116,29 @@ class DownloadWorker(QThread):
         try:
             self.progress.emit("Starting download...")
             
-            # Configure yt-dlp options based on user choice
+            # Determine if this is audio and/or playlist
+            is_audio = self.option in ["m", "mp"]
+            is_playlist = self.option in ["vp", "mp"]
+            
+            # Configure output path based on option
             if self.option == "v":
-                # Single video with best quality
-                ydl_opts = {
-                    'format': 'bestvideo+bestaudio/best',
-                    'merge_output_format': 'mp4',
-                    'outtmpl': os.path.join(self.output_path, 'Videos', '%(title)s.%(ext)s'),
-                    'noplaylist': True,
-                }
+                # Single video
+                output_template = os.path.join(self.output_path, 'Videos', '%(title)s.%(ext)s')
             elif self.option == "m":
-                # Single audio (MP3)
-                ydl_opts = {
-                    'format': 'bestaudio/best',
-                    'postprocessors': [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'mp3',
-                        'preferredquality': '192',
-                    }],
-                    'outtmpl': os.path.join(self.output_path, 'Music', '%(title)s.%(ext)s'),
-                    'noplaylist': True,
-                }
+                # Single audio
+                output_template = os.path.join(self.output_path, 'Music', '%(title)s.%(ext)s')
             elif self.option == "vp":
                 # Playlist videos
-                ydl_opts = {
-                    'format': 'bestvideo+bestaudio/best',
-                    'merge_output_format': 'mp4',
-                    'outtmpl': os.path.join(self.output_path, 'Videos', '%(playlist_index)s - %(title)s.%(ext)s'),
-                }
+                output_template = os.path.join(self.output_path, 'Videos', '%(playlist_index)s - %(title)s.%(ext)s')
             elif self.option == "mp":
-                # Playlist audio (MP3)
-                ydl_opts = {
-                    'format': 'bestaudio/best',
-                    'postprocessors': [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'mp3',
-                        'preferredquality': '192',
-                    }],
-                    'outtmpl': os.path.join(self.output_path, 'Music', '%(playlist_index)s - %(title)s.%(ext)s'),
-                }
+                # Playlist audio
+                output_template = os.path.join(self.output_path, 'Music', '%(playlist_index)s - %(title)s.%(ext)s')
             else:
                 self.finished.emit(False, "Invalid download option")
                 return
+            
+            # Get safe yt-dlp options that work with or without FFmpeg
+            ydl_opts = get_safe_ydl_opts(output_template, is_audio, is_playlist)
             
             # Add progress hook
             def progress_hook(d):
@@ -87,6 +148,8 @@ class DownloadWorker(QThread):
                     self.progress.emit(f"Downloading... {percent} at {speed}")
                 elif d['status'] == 'finished':
                     self.progress.emit("Processing...")
+                elif d['status'] == 'error':
+                    self.progress.emit(f"Error: {d.get('error', 'Unknown error')}")
             
             ydl_opts['progress_hooks'] = [progress_hook]
             
